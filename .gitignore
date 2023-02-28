@@ -1,1 +1,7 @@
 /target
+.DS_Store
+
+# Ignore the files used while testing
+*.mp4
+*.mkv
+watch.db
