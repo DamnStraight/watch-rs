@@ -103,6 +103,7 @@ impl Database {
         let bytes = Self::serialize(&self.series)?;
         let mut file = File::create("watch.db")?;
         file.write_all(&bytes)?;
+        self.dirty = false;
 
         Ok(())
     }
