@@ -1,28 +1,52 @@
+mod cmd;
 mod db;
 
+use clap::Parser;
 use std::{
     env,
     error::Error,
     fs::{self},
+    path::Path,
 };
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let args: Vec<String> = env::args().collect();
-    let command = &args[1];
+    let args = cmd::Cli::parse();
 
-    // Read the current dir and return all valid videos
-    let mut episodes = read_dir().unwrap();
+    match args.command {
+        cmd::Commands::Add { path } => {
+            let path = path
+                .as_deref()
+                .map(|s| s.to_str().unwrap().to_string())
+                .unwrap_or(env::current_dir().unwrap().to_str().unwrap().to_string());
 
-    println!("Command: {:#?}", command);
-    println!("Episodes: {:#?}", episodes);
+            let maybe_path = Path::new(&path);
 
-    // NOTE Test stuff, move this to lib eventually
-    let mut db = db::Database::init(env::current_dir()?)?;
-    db.insert(&mut episodes);
-    db.save()?;
-    db.series.watch_next()?;
-    db.print_db();
-    db.save()?;
+            if !maybe_path.exists() {
+                panic!("Invalid directory")
+            }
+
+            let mut episodes = read_dir(&path).unwrap();
+
+            if episodes.len() == 0 {
+                panic!("Directory contains no media")
+            }
+
+            // TODO databae path should be different from show directory
+            let mut db = db::Database::init(maybe_path.to_path_buf())?;
+
+            db.insert(&mut episodes, path);
+            db.save()?;
+            db.print_db();
+        }
+        cmd::Commands::Next => {
+            let mut db = db::Database::init(env::current_dir()?)?;
+            db.watch_next()?;
+        },
+        cmd::Commands::Upto { episode } => {
+            let mut db = db::Database::init(env::current_dir()?)?;
+            db.watch_up_to(episode)?;
+        }
+    }
 
     Ok(())
 }
@@ -35,9 +59,8 @@ pub fn is_video_file(file_name: &str) -> bool {
 }
 
 /// Read a directory and return a list of valid video file names
-pub fn read_dir() -> Result<Vec<String>, std::io::Error> {
-    let dir = env::current_dir()?;
-    let files = fs::read_dir(&dir)?.filter_map(|x| x.ok());
+pub fn read_dir(path: &str) -> Result<Vec<String>, std::io::Error> {
+    let files = fs::read_dir(&path)?.filter_map(|x| x.ok());
 
     let mut episodes: Vec<String> = Vec::new();
 
