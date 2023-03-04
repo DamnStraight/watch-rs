@@ -1,3 +1,7 @@
+mod add;
+mod next;
+mod upto;
+
 use clap::{Parser, Subcommand};
 use std::error::Error;
 use std::ffi::OsString;
@@ -16,11 +20,30 @@ pub struct Cli {
 
 #[derive(Debug, Subcommand)]
 pub enum Commands {
-    Add { path: Option<OsString> },
-    Next,
-    Upto { episode: usize }
+    Add(Add),
+    Next(Next),
+    Upto(Upto),
 }
 
-// impl Run for Commands::Add {
+#[derive(Debug, Parser)]
+pub struct Add {
+    path: Option<OsString>,
+}
 
-// }
+#[derive(Debug, Parser)]
+pub struct Next;
+
+#[derive(Debug, Parser)]
+pub struct Upto {
+    episode: usize,
+}
+
+impl Run for Cli {
+    fn run(&self) -> Result<(), Box<dyn Error>> {
+        match &self.command {
+            Commands::Add(cmd) => cmd.run(),
+            Commands::Next(cmd) => cmd.run(),
+            Commands::Upto(cmd) => cmd.run(),
+        }
+    }
+}

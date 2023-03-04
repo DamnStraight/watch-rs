@@ -40,8 +40,6 @@ impl Episode {
 pub struct Database {
     path: PathBuf,
     pub series: Series,
-    bytes: Vec<u8>,
-    dirty: bool,
 }
 
 impl Database {
@@ -53,28 +51,19 @@ impl Database {
             Ok(bytes) => Ok(Database {
                 path,
                 series: Self::deserialize(&bytes).unwrap(),
-                bytes,
-                dirty: false,
             }),
             Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(Database {
                 path,
-                bytes: Vec::new(),
                 series: Series::new(data_dir.to_str().unwrap().to_string()),
-                dirty: false,
             }),
             Err(e) => Err(Box::new(e)),
         }
     }
 
     pub fn save(&mut self) -> Result<(), Box<dyn Error>> {
-        if !self.dirty {
-            return Ok(());
-        }
-
         let bytes = Self::serialize(&self.series)?;
-        let mut file = File::create("watch.db")?;
+        let mut file = File::create(&self.path)?;
         file.write_all(&bytes)?;
-        self.dirty = false;
 
         Ok(())
     }
@@ -88,17 +77,13 @@ impl Database {
                 .any(|episode| episode.name == *show)
         });
 
-        self.series.episodes.append(
-            &mut shows
-                .iter()
-                .map(|name| Episode::new(name.to_string()))
-                .collect::<Vec<Episode>>(),
-        );
+        self.series.episodes = shows
+            .iter()
+            .map(|name| Episode::new(name.to_string()))
+            .collect::<Vec<Episode>>();
 
         self.series.episodes.sort_by(|a, b| a.name.cmp(&b.name));
         self.series.dir = dir;
-
-        self.dirty = true;
     }
 
     pub fn serialize(data: &Series) -> Result<Vec<u8>, Box<dyn Error>> {
@@ -138,7 +123,6 @@ impl Database {
             return match execution_result {
                 Ok(_) => {
                     episode.watched = true;
-                    self.dirty = true;
                     self.save()?;
 
                     Ok(())
@@ -159,10 +143,9 @@ impl Database {
             self.series.episodes[i].watched = true;
         }
 
-        self.dirty = true;
         self.save().unwrap();
         self.print_db();
 
-        return Ok(())
+        return Ok(());
     }
 }
